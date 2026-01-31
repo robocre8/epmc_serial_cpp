@@ -9,8 +9,9 @@
 #include <vector>
 #include <tuple>
 #include <utility>
-#include <stdexcept>
+#include <thread>
 #include <chrono>
+#include <stdexcept>
 #include <cmath>
 
 /* =======================
@@ -20,7 +21,7 @@
 namespace 
 {
 
-static constexpr uint8_t START_BYTE = 0xAA;
+static constexpr uint8_t START_BYTE        = 0xAA;
 
 // Command IDs
 static constexpr uint8_t WRITE_VEL         = 0x01;
@@ -59,10 +60,10 @@ static constexpr uint8_t SET_I2C_ADDR      = 0x19;
 static constexpr uint8_t GET_I2C_ADDR      = 0x1A;
 
 static constexpr uint8_t RESET_PARAMS      = 0x1B;
-
 static constexpr uint8_t READ_MOTOR_DATA   = 0x2A;
 static constexpr uint8_t CLEAR_DATA_BUFFER = 0x2C;
-
+static constexpr uint8_t GET_NUM_OF_MOTORS = 0x2D;
+  
 }
 
 
@@ -118,11 +119,31 @@ inline LibSerial::BaudRate convert_baud_rate(int baud_rate)
 namespace epmc_serial
 {
 
+enum class SupportedNumOfMotors: int {
+  TWO = 2,
+  FOUR = 4
+};
+
 class EPMCSerialClient
 {
 public:
-    EPMCSerialClient() = default;
-    ~EPMCSerialClient() { disconnect(); }
+    // EPMCSerialClient() = default;
+    EPMCSerialClient(SupportedNumOfMotors supported_num_of_motors) {
+      switch (supported_num_of_motors)
+      {
+      case SupportedNumOfMotors::TWO :
+        num_of_motors = 2;
+        break;
+      
+      case SupportedNumOfMotors::FOUR :
+        num_of_motors = 4;
+        break;
+      }
+    };
+
+    ~EPMCSerialClient() { 
+      disconnect();
+    }
 
     /* ---------- Connection ---------- */
 
@@ -131,7 +152,7 @@ public:
                  int timeout_ms = 100)
     {
         if (serial.IsOpen())
-            serial.Close();
+        serial.Close();
 
         serial.Open(port);
 
@@ -142,6 +163,24 @@ public:
         serial.SetFlowControl(LibSerial::FlowControl::FLOW_CONTROL_NONE);
 
         timeout_ms_ = timeout_ms;
+
+        // ---- Allow MCU to boot / flush startup bytes ----
+        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+
+        // ---- Retry confirm motors ----
+        constexpr int max_attempts = 10;
+
+        for (int i = 0; i < max_attempts; ++i)
+        {
+            if (confirmNumOfMotors()){
+              std::cout << "EPMC Connected Successfully" << std::endl;
+              return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        disconnect();
+        throw std::runtime_error("EPMC motor count mismatch");
     }
 
     void disconnect()
@@ -157,17 +196,24 @@ public:
 
     /* ---------- High-Level API ---------- */
 
+    bool confirmNumOfMotors()
+    {
+        bool success; float motor_num = 0.0f;
+        std::tie(success, motor_num) = read_data1(GET_NUM_OF_MOTORS);
+        return success && ((int)motor_num == num_of_motors);
+    }
+
     // Motion
-    void writeSpeed(float v0, float v1) { write_data2(WRITE_VEL, v0, v1); }
-    void writePWM(float p0, float p1)   { write_data2(WRITE_PWM, p0, p1); }
+    void writeSpeed(float v0, float v1, float v2, float v3) { write_data4(WRITE_VEL, v0, v1, v2, v3); }
+    void writePWM(float p0, float p1, float p2, float p3)   { write_data4(WRITE_PWM, p0, p1, p2, p3); }
 
-    std::tuple<bool, float, float> readPos() { return read_data2(READ_POS); }
-    std::tuple<bool, float, float> readVel() { return read_data2(READ_VEL); }
-    std::tuple<bool, float, float> readUVel(){ return read_data2(READ_UVEL); }
-    std::tuple<bool, float, float> readTVel(){ return read_data2(READ_TVEL); }
+    std::tuple<bool, float, float, float, float> readPos() { return read_data4(READ_POS); }
+    std::tuple<bool, float, float, float, float> readVel() { return read_data4(READ_VEL); }
+    std::tuple<bool, float, float, float, float> readUVel(){ return read_data4(READ_UVEL); }
+    std::tuple<bool, float, float, float, float> readTVel(){ return read_data4(READ_TVEL); }
 
-    std::tuple<bool, float, float, float, float>
-    readMotorData() { return read_data4(READ_MOTOR_DATA); }
+    std::tuple<bool, float, float, float, float, float, float, float, float>
+    readMotorData() { return read_data8(READ_MOTOR_DATA); }
 
     // PID & Control
     void setKP(float v, uint8_t motor) { write_data1(SET_KP, v, motor); }
@@ -217,6 +263,7 @@ public:
 private:
     LibSerial::SerialPort serial;
     int timeout_ms_;
+    int num_of_motors;
 
     /* ---------- Packet Helpers ---------- */
 
@@ -270,15 +317,24 @@ private:
         const size_t bytes_needed = count * sizeof(float);
         std::vector<uint8_t> buf(bytes_needed);
 
-        serial.Read(buf, bytes_needed, timeout_ms_);
-        if (buf.size() != bytes_needed){
-          flush_rx();
-          return {false, std::vector<float>(count, 0.0f)};
+        try {
+            serial.Read(buf, bytes_needed, timeout_ms_);
+            if (buf.size() != bytes_needed){
+              flush_rx();
+              return {false, std::vector<float>(count, 0.0f)};
+            }
+        }
+        catch (const LibSerial::ReadTimeout&) {
+            flush_rx();   // critical for stream resync
+            return {false, std::vector<float>(count, 0.0f)};
+        }
+        catch (...) {
+            flush_rx();
+            return {false, std::vector<float>(count, 0.0f)};
         }
 
         std::vector<float> values(count);
         std::memcpy(values.data(), buf.data(), bytes_needed);
-
         return {true, values};
     }
 
@@ -306,20 +362,14 @@ private:
         return {ok, round_to_dp(vals[0],4)};
     }
 
-    void write_data2(uint8_t cmd, float a, float b)
+    void write_data4(uint8_t cmd, float a, float b, float c, float d)
     {
-        std::vector<uint8_t> payload(2 * sizeof(float));
+        std::vector<uint8_t> payload(4 * sizeof(float));
         std::memcpy(&payload[0], &a, sizeof(float));
         std::memcpy(&payload[4], &b, sizeof(float));
+        std::memcpy(&payload[8], &c, sizeof(float));
+        std::memcpy(&payload[12], &d, sizeof(float));
         sendPacket(cmd, payload);
-    }
-
-    std::tuple<bool, float, float>
-    read_data2(uint8_t cmd)
-    {
-        sendPacket(cmd);
-        auto [ok, vals] = readFloats(2);
-        return {ok, round_to_dp(vals[0],4), round_to_dp(vals[1],4)};
     }
 
     std::tuple<bool, float, float, float, float>
@@ -328,6 +378,14 @@ private:
         sendPacket(cmd);
         auto [ok, vals] = readFloats(4);
         return {ok, round_to_dp(vals[0],4), round_to_dp(vals[1],4), round_to_dp(vals[2],4), round_to_dp(vals[3],4)};
+    }
+
+    std::tuple<bool, float, float, float, float, float, float, float, float>
+    read_data8(uint8_t cmd)
+    {
+        sendPacket(cmd);
+        auto [ok, vals] = readFloats(8);
+        return {ok, round_to_dp(vals[0],4), round_to_dp(vals[1],4), round_to_dp(vals[2],4), round_to_dp(vals[3],4), round_to_dp(vals[4],4), round_to_dp(vals[5],4), round_to_dp(vals[6],4), round_to_dp(vals[7],4)};
     }
 };
 
