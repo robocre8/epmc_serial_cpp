@@ -127,19 +127,7 @@ enum class SupportedNumOfMotors: int {
 class EPMCSerialClient
 {
 public:
-    // EPMCSerialClient() = default;
-    EPMCSerialClient(SupportedNumOfMotors supported_num_of_motors) {
-      switch (supported_num_of_motors)
-      {
-      case SupportedNumOfMotors::TWO :
-        num_of_motors = 2;
-        break;
-      
-      case SupportedNumOfMotors::FOUR :
-        num_of_motors = 4;
-        break;
-      }
-    };
+    EPMCSerialClient() = default;
 
     ~EPMCSerialClient() { 
       disconnect();
@@ -180,7 +168,7 @@ public:
         }
 
         disconnect();
-        throw std::runtime_error("EPMC motor count mismatch");
+        throw std::runtime_error("EPMC supported number of motors mismatch");
     }
 
     void disconnect()
@@ -194,7 +182,20 @@ public:
         return serial.IsOpen();
     }
 
-    /* ---------- High-Level API ---------- */
+    void supportedNumOfMotors(SupportedNumOfMotors supported_num_of_motors) {
+      switch (supported_num_of_motors)
+      {
+      case SupportedNumOfMotors::TWO :
+        num_of_motors = 2;
+        break;
+      
+      case SupportedNumOfMotors::FOUR :
+        num_of_motors = 4;
+        break;
+      }
+    };
+
+    /* ------------------------------------ */
 
     bool confirmNumOfMotors()
     {
@@ -203,17 +204,37 @@ public:
         return success && ((int)motor_num == num_of_motors);
     }
 
+    /* ---------- High-Level API ---------- */
+
     // Motion
-    void writeSpeed(float v0, float v1, float v2, float v3) { write_data4(WRITE_VEL, v0, v1, v2, v3); }
-    void writePWM(float p0, float p1, float p2, float p3)   { write_data4(WRITE_PWM, p0, p1, p2, p3); }
+    void writeSpeed(float v0, float v1, float v2=0.0, float v3=0.0) {
+      if(num_of_motors == 2) write_data2(WRITE_VEL, v0, v1); 
+      else if(num_of_motors == 4) write_data4(WRITE_VEL, v0, v1, v2, v3); 
+    }
 
-    std::tuple<bool, float, float, float, float> readPos() { return read_data4(READ_POS); }
-    std::tuple<bool, float, float, float, float> readVel() { return read_data4(READ_VEL); }
-    std::tuple<bool, float, float, float, float> readUVel(){ return read_data4(READ_UVEL); }
-    std::tuple<bool, float, float, float, float> readTVel(){ return read_data4(READ_TVEL); }
+    void writePWM(float p0, float p1, float p2=0.0, float p3=0.0)   {
+      if(num_of_motors == 2) write_data2(WRITE_PWM, p0, p1);
+      else if(num_of_motors == 4) write_data4(WRITE_PWM, p0, p1, p2, p3);
+    }
 
-    std::tuple<bool, float, float, float, float, float, float, float, float>
-    readMotorData() { return read_data8(READ_MOTOR_DATA); }
+    std::tuple<bool, std::vector<float>> readPos() { return _read_motor_array(READ_POS); }
+    std::tuple<bool, std::vector<float>> readVel() { return _read_motor_array(READ_VEL); }
+    std::tuple<bool, std::vector<float>> readUVel(){ return _read_motor_array(READ_UVEL); }
+    std::tuple<bool, std::vector<float>> readTVel(){ return _read_motor_array(READ_TVEL); }
+
+    std::tuple<bool, std::vector<float>>
+    readMotorData() {
+      if(num_of_motors == 2){
+        return read_data4(READ_MOTOR_DATA);
+      }
+      else if(num_of_motors == 4){
+        return read_data8(READ_MOTOR_DATA);
+      }
+      else {
+        std::vector<float> values;
+        return {false, values};
+      }
+    }
 
     // PID & Control
     void setKP(float v, uint8_t motor) { write_data1(SET_KP, v, motor); }
@@ -348,6 +369,24 @@ private:
         sendPacket(cmd, payload);
     }
 
+    void write_data2(uint8_t cmd, float a, float b)
+    {
+        std::vector<uint8_t> payload(2 * sizeof(float));
+        std::memcpy(&payload[0], &a, sizeof(float));
+        std::memcpy(&payload[4], &b, sizeof(float));
+        sendPacket(cmd, payload);
+    }
+
+    void write_data4(uint8_t cmd, float a, float b, float c, float d)
+    {
+        std::vector<uint8_t> payload(4 * sizeof(float));
+        std::memcpy(&payload[0], &a, sizeof(float));
+        std::memcpy(&payload[4], &b, sizeof(float));
+        std::memcpy(&payload[8], &c, sizeof(float));
+        std::memcpy(&payload[12], &d, sizeof(float));
+        sendPacket(cmd, payload);
+    }
+
     std::tuple<bool, float>
     read_data1(uint8_t cmd, uint8_t pos = 0)
     {
@@ -362,30 +401,59 @@ private:
         return {ok, round_to_dp(vals[0],4)};
     }
 
-    void write_data4(uint8_t cmd, float a, float b, float c, float d)
+    std::tuple<bool, std::vector<float>>
+    read_data2(uint8_t cmd)
     {
-        std::vector<uint8_t> payload(4 * sizeof(float));
-        std::memcpy(&payload[0], &a, sizeof(float));
-        std::memcpy(&payload[4], &b, sizeof(float));
-        std::memcpy(&payload[8], &c, sizeof(float));
-        std::memcpy(&payload[12], &d, sizeof(float));
-        sendPacket(cmd, payload);
+        sendPacket(cmd);
+        auto [ok, vals] = readFloats(2);
+        std::vector<float> value(2);
+        value[0] = round_to_dp(vals[0],4);
+        value[1] = round_to_dp(vals[1],4);
+        return {ok, value};
     }
 
-    std::tuple<bool, float, float, float, float>
+    std::tuple<bool, std::vector<float>>
     read_data4(uint8_t cmd)
     {
         sendPacket(cmd);
         auto [ok, vals] = readFloats(4);
-        return {ok, round_to_dp(vals[0],4), round_to_dp(vals[1],4), round_to_dp(vals[2],4), round_to_dp(vals[3],4)};
+        std::vector<float> value(4);
+        value[0] = round_to_dp(vals[0],4);
+        value[1] = round_to_dp(vals[1],4);
+        value[2] = round_to_dp(vals[2],4);
+        value[3] = round_to_dp(vals[3],4);
+        return {ok, value};
     }
 
-    std::tuple<bool, float, float, float, float, float, float, float, float>
+    std::tuple<bool, std::vector<float>>
     read_data8(uint8_t cmd)
     {
         sendPacket(cmd);
         auto [ok, vals] = readFloats(8);
-        return {ok, round_to_dp(vals[0],4), round_to_dp(vals[1],4), round_to_dp(vals[2],4), round_to_dp(vals[3],4), round_to_dp(vals[4],4), round_to_dp(vals[5],4), round_to_dp(vals[6],4), round_to_dp(vals[7],4)};
+        std::vector<float> value(8);
+        value[0] = round_to_dp(vals[0],4);
+        value[1] = round_to_dp(vals[1],4);
+        value[2] = round_to_dp(vals[2],4);
+        value[3] = round_to_dp(vals[3],4);
+        value[4] = round_to_dp(vals[4],4);
+        value[5] = round_to_dp(vals[5],4);
+        value[6] = round_to_dp(vals[6],4);
+        value[7] = round_to_dp(vals[7],4);
+        return {ok, value};
+    }
+
+    std::tuple<bool, std::vector<float>>
+    _read_motor_array(uint8_t cmd){
+      if(num_of_motors == 2){
+        return read_data2(cmd);
+      }
+      else if(num_of_motors == 4){
+        return read_data4(cmd);
+      }
+      else {
+        std::vector<float> values;
+        return {false, values};
+      }
     }
 };
 

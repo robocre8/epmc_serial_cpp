@@ -6,29 +6,6 @@ This library helps communicate with the **`Easy PID Motor Controller Module`** (
 A simple way to get started is simply to try out and follow the example code in the example folder
 
 
-## How to Use the .deb Package
-
-#### Prequisite
-- ensure you've already set up your microcomputer or PC system with ROS2
-
-- download and install the epmc-serial-dev pkg. you can also check the [release](https://github.com/robocre8/epmc_serial_cpp/releases/)
-
-[PC (AMD64)](https://github.com/robocre8/epmc_serial_cpp/tree/amd64-build)
-```shell
-wget https://github.com/robocre8/epmc_serial_cpp/releases/download/v1.1.1/epmc-serial-dev_1.1.1_amd64.deb
-```
-```shell
-sudo apt install ./epmc-serial-dev_1.1.1_amd64.deb
-```
-[Raspberry Pi (ARM64)](https://github.com/robocre8/epmc_serial_cpp/tree/arm64-build)
-```shell
-wget https://github.com/robocre8/epmc_serial_cpp/releases/download/v1.1.1/epmc-serial-dev_1.1.1_arm64.deb
-```
-```shell
-sudo apt install ./epmc-serial-dev_1.1.1_arm64.deb
-```
-
-
 ## How to Use the Library (build from source)
 - install the libserial-dev package
   > sudo apt-get update
@@ -57,29 +34,35 @@ sudo apt install ./epmc-serial-dev_1.1.1_arm64.deb
   > mkdir build (i.e create a folder named build)
   >
   > enter the following command in the terminal in the root folder:
-    ````
+    ````shell
     cmake -B ./build/
     ````
-    ````
+    ````shell
     cmake --build ./build/
     ````
+    ````shell
+    ./build/two_motor_control
     ````
-    ./build/motor_control
+    ````shell
+    ./build/four_motor_control
     ````
 
-- You can follow the pattern used in the example `motor_control.cpp` in your own code.
+- You can follow the pattern used in the example `two_motor_control.cpp` and `four_motor_control.cpp` in your own code.
 
 
-
- 
-## Basic Library functions and usage
+## Basic Library functions and usage (Two Motor Support Control)
 
 - connect to epmc_driver shield module
   > epmc_serial::EPMCSerialClient controller
   >
-  > controller.connect("port_name or port_path")
+  >  _//ensure you set/call **supportedNumOfMotors()** before **connect()** as below:_
   >
-  > controller.clearDataBuffer() # returns bool -> success
+  > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO);
+  >
+  > controller.connect("port_name or port_path")
+
+- clear speed, position, e.t.c data buffer on the EPMC module
+  > controller.clearDataBuffer() // returns bool -> success
 
 - send target angular velocity command
   > controller.writeSpeed(motor0_TargetVel, motor1_TargetVel)
@@ -91,14 +74,62 @@ sudo apt install ./epmc-serial-dev_1.1.1_arm64.deb
   > controller.setCmdTimeout(timeout_ms)
 
 - get motor command timeout
-  > controller.getCmdTimeout() # returns std::tuple -> (success, motor_command_timeout_ms): bool, float
+  > controller.getCmdTimeout() // returns std::tuple -> bool, float
+
+- read motors angular position and angular velocity
+  > controller.readMotorData() // returns std::tuple -> bool, std::vector<float> (pos0, pos1, vel0, vel1)
 
 - read motors angular position
-  > controller.readPos() # returns std::tuple -> (success, angPos0, angPos1): bool, float, float
+  > controller.readPos() // returns std::tuple -> bool, std::vector<float> (pos0, pos1)
 
 - read motors angular velocity
-  > controller.readVel() # returns std::tuple -> (success, angVel0, angVel1): bool, float, float
+  > controller.readVel() // returns std::tuple -> bool, std::vector<float> (vel0, vel1)
 
-- read motorA maximum commandable angular velocity
-  > controller.getMaxVel(motor_no) # returns std::tuple -> (success, max_vel): bool, float, float
+- read motor maximum commandable angular velocity
+  > controller.getMaxVel(motor_no) // returns std::tuple -> bool, float
   > maxVel0 or maxVel1 based on the specified motor number
+
+- while these function above help communicate with the already configure EPMC module, more examples of advanced funtions usage for parameter tuning can be found in the [epmc_setup_application](https://github.com/robocre8/epmc_setup_application) source code
+
+#
+
+## Basic Library functions and usage (Four Motor Support Control)
+
+- connect to epmc_driver shield module
+  > epmc_serial::EPMCSerialClient controller
+  >
+  >  _//ensure you set/call **supportedNumOfMotors()** before **connect()** as below:_
+  >
+  > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::FOUR)
+  >
+  > controller.connect("port_name or port_path")
+
+- clear speed, position, e.t.c data buffer on the EPMC module
+  > controller.clearDataBuffer() // returns bool -> success
+
+- send target angular velocity command
+  > controller.writeSpeed(motor0_TargetVel, motor1_TargetVel, motor2_TargetVel, motor3_TargetVel)
+
+- send PWM command
+  > controller.writePWM(motor0_PWM, motor1_PWM, motor2_PWM, motor3_PWM)
+
+- set motor command timeout
+  > controller.setCmdTimeout(timeout_ms)
+
+- get motor command timeout
+  > controller.getCmdTimeout() // returns std::tuple -> bool, float
+
+- read motors angular position and angular velocity
+  > controller.readMotorData() // returns std::tuple -> bool, std::vector<float> (pos0, pos1, pos2, pos3, vel0, vel1, vel2, vel3)
+
+- read motors angular position
+  > controller.readPos() // returns std::tuple -> bool, std::vector<float> (pos0, pos1, pos2, pos3)
+
+- read motors angular velocity
+  > controller.readVel() // returns std::tuple -> bool, std::vector<float> (vel0, vel1, vel2, vel3)
+
+- read motor maximum commandable angular velocity
+  > controller.getMaxVel(motor_no) // returns std::tuple -> bool, float
+  > maxVel0 or maxVel1 based on the specified motor number
+
+- while these function above help communicate with the already configure EPMC module, more examples of advanced funtions usage for parameter tuning can be found in the [epmc_setup_application](https://github.com/robocre8/epmc_setup_application) source code

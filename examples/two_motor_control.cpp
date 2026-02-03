@@ -9,7 +9,7 @@
 
 #include "epmc_serial.hpp"
 
-epmc_serial::EPMCSerialClient controller(epmc_serial::SupportedNumOfMotors::FOUR);
+epmc_serial::EPMCSerialClient controller;
 
 void delay_ms(unsigned long milliseconds)
 {
@@ -19,10 +19,11 @@ void delay_ms(unsigned long milliseconds)
 int main(int argc, char **argv)
 {
   // variable for communication
-  bool success; float val0, val1, val2, val3, val4, val5, val6, val7;
+  bool success; float val0;
+  std::vector<float> val;
 
-  float pos0=0.0, pos1=0.0, pos2=0.0, pos3=0.0;
-  float vel0=0.0, vel1=0.0, vel2=0.0, vel3=0.0;
+  float pos0=0.0, pos1=0.0;
+  float vel0=0.0, vel1=0.0;
 
   // [4 rev/sec, 2 rev/sec, 1 rev/sec, 0.5 rev/sec]
   float targetVel[] = {1.571, 3.142, 6.284, 12.568}; // in rad/sec
@@ -38,13 +39,14 @@ int main(int argc, char **argv)
   float readTimeInterval = 0.02; // 50Hz
 
   // 50Hz comm setup
-  std::string serial_port = "/dev/ttyUSB0";
+  std::string serial_port = "/dev/ttyACM0";
   int serial_baudrate = 115200;
   int serial_timeout_ms = 18; // value < 20ms (50 Hz comm)
+  controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO);
   controller.connect(serial_port, serial_baudrate, serial_timeout_ms);
   
   success = controller.clearDataBuffer();
-  controller.writeSpeed(v, v, v, v);
+  controller.writeSpeed(v, v);
 
   int motor_cmd_timeout_ms = 10000;
   controller.setCmdTimeout(motor_cmd_timeout_ms); // set motor command timeout
@@ -70,14 +72,14 @@ int main(int argc, char **argv)
       if (sendHigh)
       {
         v = vel;
-        controller.writeSpeed(v, v, v, v);
+        controller.writeSpeed(v, v);
         vel *= -1;
         sendHigh = false;
       }
       else
       {
         v = 0.0;
-        controller.writeSpeed(v, v, v, v);
+        controller.writeSpeed(v, v);
         sendHigh = true;
       }
 
@@ -89,28 +91,24 @@ int main(int argc, char **argv)
     {
 
       // controller.writeSpeed(v, v);
-      // std::tie(success, val0, val1, val2, val3, val4, val5, val6, val7) = controller.readMotorData();
-      std::tie(success, val0, val1, val2, val3) = controller.readPos();
+      std::tie(success, val) = controller.readMotorData();
       if (success) { // only update if read was successfull
-        pos0 = val0; pos1 = val1; pos2 = val2; pos3 = val3;
+        pos0 = val.at(0); pos1 = val.at(1);
+        vel0 = val.at(2); vel1 = val.at(3);
+
+        std::cout << "----------------------------------" << std::endl;
+        std::cout << "motor0_readings: [" << pos0 << "," << vel0 << "]" << std::endl;
+        std::cout << "motor1_readings: [" << pos1 << "," << vel1 << "]" << std::endl;
+        std::cout << "----------------------------------" << std::endl;
+        std::cout << std::endl;
       }
-      else{
-        std::cout << "error1" << std::endl;
+      else {
+        std::cout << "----------------------------------" << std::endl;
+        std::cout << "error reading motor data" << std::endl;
+        std::cout << "----------------------------------" << std::endl;
+        std::cout << std::endl;
       }
-      std::tie(success, val0, val1, val2, val3) = controller.readVel();
-      if (success) { // only update if read was successfull
-        vel0 = val0; vel1 = val1; vel2 = val2; vel3 = val3;
-      }
-      else{
-        std::cout << "error2" << std::endl;
-      }
-      std::cout << "----------------------------------" << std::endl;
-      std::cout << "motor0_readings: [" << pos0 << "," << vel0 << "]" << std::endl;
-      std::cout << "motor1_readings: [" << pos1 << "," << vel1 << "]" << std::endl;
-      std::cout << "motor2_readings: [" << pos2 << "," << vel2 << "]" << std::endl;
-      std::cout << "motor3_readings: [" << pos3 << "," << vel3 << "]" << std::endl;
-      std::cout << "----------------------------------" << std::endl;
-      std::cout << std::endl;
+      
 
       readTime = std::chrono::system_clock::now();
     }
