@@ -119,11 +119,6 @@ inline LibSerial::BaudRate convert_baud_rate(int baud_rate)
 namespace epmc_serial
 {
 
-enum class SupportedNumOfMotors: int {
-  TWO = 2,
-  FOUR = 4
-};
-
 class EPMCSerialClient
 {
 public:
@@ -181,19 +176,6 @@ public:
     {
         return serial.IsOpen();
     }
-
-    void supportedNumOfMotors(SupportedNumOfMotors supported_num_of_motors) {
-      switch (supported_num_of_motors)
-      {
-      case SupportedNumOfMotors::TWO :
-        num_of_motors = 2;
-        break;
-      
-      case SupportedNumOfMotors::FOUR :
-        num_of_motors = 4;
-        break;
-      }
-    };
 
     /* ------------------------------------ */
 
@@ -284,7 +266,7 @@ public:
 private:
     LibSerial::SerialPort serial;
     int timeout_ms_;
-    int num_of_motors;
+    int num_of_motors = 4;
 
     /* ---------- Packet Helpers ---------- */
 

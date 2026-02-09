@@ -22,9 +22,9 @@ A simple way to get started is simply to try out and follow the example code in 
 
 - check the serial port the driver is connected to:
   ```shell
-  ls /dev/ttyA*
+  ls /dev/ttyU*
   ```
-  > you should see /dev/ttyACM0 or /dev/ttyACM1 and so on
+  > you should see /dev/ttyUSB0 or /dev/ttyUSB1 and so on
 
 - A simple way to get started is simply to try out and follow the example `motor_control.cpp` code.
 
@@ -41,55 +41,10 @@ A simple way to get started is simply to try out and follow the example code in 
     cmake --build ./build/
     ````
     ````shell
-    ./build/two_motor_control
-    ````
-    ````shell
-    ./build/four_motor_control
+    ./build/motor_control
     ````
 
-- You can follow the pattern used in the example `two_motor_control.cpp` and `four_motor_control.cpp` in your own code.
-
-
-## Basic Library functions and usage (Two Motor Support Control)
-
-- connect to epmc_driver shield module
-  > epmc_serial::EPMCSerialClient controller
-  >
-  >  _//ensure you set/call **supportedNumOfMotors()** before **connect()** as below:_
-  >
-  > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO);
-  >
-  > controller.connect("port_name or port_path")
-
-- clear speed, position, e.t.c data buffer on the EPMC module
-  > controller.clearDataBuffer() // returns bool -> success
-
-- send target angular velocity command
-  > controller.writeSpeed(motor0_TargetVel, motor1_TargetVel)
-
-- send PWM command
-  > controller.writePWM(motor0_PWM, motor1_PWM)
-
-- set motor command timeout
-  > controller.setCmdTimeout(timeout_ms)
-
-- get motor command timeout
-  > controller.getCmdTimeout() // returns std::tuple -> bool, float
-
-- read motors angular position and angular velocity
-  > controller.readMotorData() // returns std::tuple -> bool, std::vector<float> (pos0, pos1, vel0, vel1)
-
-- read motors angular position
-  > controller.readPos() // returns std::tuple -> bool, std::vector<float> (pos0, pos1)
-
-- read motors angular velocity
-  > controller.readVel() // returns std::tuple -> bool, std::vector<float> (vel0, vel1)
-
-- read motor maximum commandable angular velocity
-  > controller.getMaxVel(motor_no) // returns std::tuple -> bool, float
-  > maxVel0 or maxVel1 based on the specified motor number
-
-- while these function above help communicate with the already configure EPMC module, more examples of advanced funtions usage for parameter tuning can be found in the [epmc_setup_application](https://github.com/robocre8/epmc_setup_application) source code
+- You can follow the pattern used in the example `motor_control.cpp` in your own code.
 
 #
 
@@ -97,10 +52,6 @@ A simple way to get started is simply to try out and follow the example code in 
 
 - connect to epmc_driver shield module
   > epmc_serial::EPMCSerialClient controller
-  >
-  >  _//ensure you set/call **supportedNumOfMotors()** before **connect()** as below:_
-  >
-  > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::FOUR)
   >
   > controller.connect("port_name or port_path")
 
@@ -120,13 +71,13 @@ A simple way to get started is simply to try out and follow the example code in 
   > controller.getCmdTimeout() // returns std::tuple -> bool, float
 
 - read motors angular position and angular velocity
-  > controller.readMotorData() // returns std::tuple -> bool, std::vector<float> (pos0, pos1, pos2, pos3, vel0, vel1, vel2, vel3)
+  > controller.readMotorData() // returns std::tuple -> bool, std::vector<float-size8> (pos0, pos1, pos2, pos3, vel0, vel1, vel2, vel3)
 
 - read motors angular position
-  > controller.readPos() // returns std::tuple -> bool, std::vector<float> (pos0, pos1, pos2, pos3)
+  > controller.readPos() // returns std::tuple -> bool, std::vector<float-size4> (pos0, pos1, pos2, pos3)
 
 - read motors angular velocity
-  > controller.readVel() // returns std::tuple -> bool, std::vector<float> (vel0, vel1, vel2, vel3)
+  > controller.readVel() // returns std::tuple -> bool, std::vector<float-size4> (vel0, vel1, vel2, vel3)
 
 - read motor maximum commandable angular velocity
   > controller.getMaxVel(motor_no) // returns std::tuple -> bool, float
