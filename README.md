@@ -10,10 +10,10 @@ C++ serial interface for the Easy PID Motor Controller (EPMC).
 
 **PC (AMD64)**
 ```shell
-wget https://github.com/robocre8/epmc_serial_cpp/releases/download/v1.3.0/epmc-serial-dev_1.3.0_amd64.deb
+wget https://github.com/robocre8/epmc_serial_cpp/releases/download/v1.3.1/epmc-serial-dev_1.3.1_amd64.deb
 ```
 ```shell
-sudo apt install ./epmc-serial-dev_1.3.0_amd64.deb
+sudo apt install ./epmc-serial-dev_1.3.1_amd64.deb
 ```
 
 #
@@ -52,8 +52,6 @@ sudo apt install ./epmc-serial-dev_1.3.0_amd64.deb
 - connect to epmc_driver shield module
   > epmc_serial::EPMCSerialClient controller
   >
-  >  _//ensure you set/call **supportedNumOfMotors()** before **connect()** as below:_
-  >
   > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO);
   >
   > controller.connect("port_name or port_path")
@@ -90,13 +88,13 @@ sudo apt install ./epmc-serial-dev_1.3.0_amd64.deb
 
 #
 
-## example code - two_motor_control.cpp
+## example code - motor_control.cpp
 
 ```
-/two_motor_control
+/motor_control
 ├── include/
 └── src
-    ├── two_motor_control.cpp
+    ├── motor_control.cpp
  CMakeLists.txt
 ```
 
@@ -140,11 +138,10 @@ int main(int argc, char **argv)
   std::chrono::duration<double> readDuration;
   float readTimeInterval = 0.02; // 50Hz
 
-  // 50Hz comm setup
+  // EPMC connect
   std::string serial_port = "/dev/ttyACM0";
   int serial_baudrate = 115200;
   int serial_timeout_ms = 18; // value < 20ms (50 Hz comm)
-  controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO);
   controller.connect(serial_port, serial_baudrate, serial_timeout_ms);
   
   success = controller.clearDataBuffer();
@@ -223,17 +220,17 @@ int main(int argc, char **argv)
 ## example CMakeLists.txt
 ```txt
   cmake_minimum_required(VERSION 3.16)
-  project(two_motor_control LANGUAGES CXX)
+  project(motor_control LANGUAGES CXX)
 
   find_package(epmc_serial REQUIRED)
 
-  add_executable(twomotor_control src/two_motor_control.cpp)
-  target_link_libraries(two_motor_control epmc_serial::epmc_serial)
+  add_executable(motor_control src/motor_control.cpp)
+  target_link_libraries(motor_control epmc_serial::epmc_serial)
 
 ```
 
 
-## Basic Library functions and usage (Four Motor Support Control)
+## Basic Library functions and usage (Four Motor Support)
 
 - connect to epmc_driver shield module
   > epmc_serial::EPMCSerialClient controller
@@ -276,13 +273,13 @@ int main(int argc, char **argv)
 
 #
 
-## example code - four_motor_control.cpp
+## example code - four_motor_support.cpp
 
 ```
-/four_motor_control
+/four_motor_support
 ├── include/
 └── src
-    ├── four_motor_control.cpp
+    ├── four_motor_support.cpp
  CMakeLists.txt
 ```
 
@@ -326,7 +323,7 @@ int main(int argc, char **argv)
   std::chrono::duration<double> readDuration;
   float readTimeInterval = 0.02; // 50Hz
 
-  // 50Hz comm setup
+  // EPMC connect
   std::string serial_port = "/dev/ttyUSB0";
   int serial_baudrate = 115200;
   int serial_timeout_ms = 18; // value < 20ms (50 Hz comm)
@@ -411,12 +408,12 @@ int main(int argc, char **argv)
 ## example CMakeLists.txt
 ```txt
   cmake_minimum_required(VERSION 3.16)
-  project(four_motor_control LANGUAGES CXX)
+  project(four_motor_support LANGUAGES CXX)
 
   find_package(epmc_serial REQUIRED)
 
-  add_executable(four_motor_control src/four_motor_control.cpp)
-  target_link_libraries(four_motor_control epmc_serial::epmc_serial)
+  add_executable(four_motor_support src/four_motor_support.cpp)
+  target_link_libraries(four_motor_support epmc_serial::epmc_serial)
 
 ```
 
@@ -434,9 +431,9 @@ int main(int argc, char **argv)
     cmake --build ./build/
     ````
     ````
-    ./build/two_motor_control
+    ./build/motor_control
     ````
     OR
     ````
-    ./build/four_motor_control
+    ./build/four_motor_support
     ````
