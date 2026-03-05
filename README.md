@@ -41,23 +41,18 @@ A simple way to get started is simply to try out and follow the example code in 
     cmake --build ./build/
     ````
     ````shell
-    ./build/two_motor_control
-    ````
-    ````shell
-    ./build/four_motor_control
+    ./build/motor_control
     ````
 
-- You can follow the pattern used in the example `two_motor_control.cpp` and `four_motor_control.cpp` in your own code.
+- You can follow the pattern used in the example `motor_control.cpp` and `four_motor_support.cpp` in your own code.
 
 
-## Basic Library functions and usage (Two Motor Support Control)
+## Basic Library functions and usage (Motor Control Default - two motor support module)
 
 - connect to epmc_driver shield module
   > epmc_serial::EPMCSerialClient controller
   >
-  >  _//ensure you set/call **supportedNumOfMotors()** before **connect()** as below:_
-  >
-  > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO);
+  > controller.supportedNumOfMotors(epmc_serial::SupportedNumOfMotors::TWO)
   >
   > controller.connect("port_name or port_path")
 
@@ -93,7 +88,7 @@ A simple way to get started is simply to try out and follow the example code in 
 
 #
 
-## Basic Library functions and usage (Four Motor Support Control)
+## Basic Library functions and usage (Motor Control - four motor support module)
 
 - connect to epmc_driver shield module
   > epmc_serial::EPMCSerialClient controller

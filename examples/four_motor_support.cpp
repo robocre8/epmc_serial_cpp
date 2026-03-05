@@ -38,7 +38,7 @@ int main(int argc, char **argv)
   std::chrono::duration<double> readDuration;
   float readTimeInterval = 0.02; // 50Hz
 
-  // 50Hz comm setup
+  // EPMC connect
   std::string serial_port = "/dev/ttyUSB0";
   int serial_baudrate = 115200;
   int serial_timeout_ms = 18; // value < 20ms (50 Hz comm)
